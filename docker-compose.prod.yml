@@ -3,7 +3,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: app_backend
+    container_name: instay_backend
     restart: unless-stopped
     environment:
       PG_HOST: ${PG_HOST:-localhost}
@@ -62,7 +62,7 @@ services:
     volumes:
       - ./backend/logs:/app/logs
     networks:
-      - app_network
+      - instay_network
 
   frontend:
     build:
@@ -70,7 +70,7 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://yourdomain.com/api/v1}
-    container_name: app_frontend
+    container_name: instayfrontend
     restart: unless-stopped
     environment:
       NODE_ENV: production
@@ -80,11 +80,11 @@ services:
     depends_on:
       - backend
     networks:
-      - app_network
+      - instay_network
 
   nginx:
     image: nginx:alpine
-    container_name: app_nginx
+    container_name: instay_nginx
     restart: unless-stopped
     ports:
       - "80:80"
@@ -98,15 +98,15 @@ services:
       - frontend
       - backend
     networks:
-      - app_network
+      - instay_network
 
   certbot:
     image: certbot/certbot
-    container_name: app_certbot
+    container_name: instay_certbot
     volumes:
       - ./certbot/conf:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot
 
 networks:
-  app_network:
+  instay_network:
     driver: bridge

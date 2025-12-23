@@ -3,7 +3,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: app_backend
+    container_name: instay_backend
     restart: unless-stopped
     environment:
       PG_HOST: ${PG_HOST:-localhost}
@@ -62,7 +62,7 @@ services:
     volumes:
       - ./backend/logs:/app/logs
     networks:
-      - app_network
+      - instay_network
 
   frontend:
     build:
@@ -70,7 +70,7 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080/api/v1}
-    container_name: app_frontend
+    container_name: instay_frontend
     restart: unless-stopped
     environment:
       NODE_ENV: production
@@ -80,8 +80,8 @@ services:
     depends_on:
       - backend
     networks:
-      - app_network
+      - instay_network
 
 networks:
-  app_network:
+  instay_network:
     driver: bridge
