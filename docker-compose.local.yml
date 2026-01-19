@@ -43,7 +43,7 @@ services:
     networks:
       - backend
     ports:
-      - "5432:5432"
+      - "5431:5432"
     healthcheck:
       test:
         [
@@ -80,8 +80,8 @@ services:
       RABBITMQ_DEFAULT_PASS: ${RMQ_PASSWORD:-12345678}
       RABBITMQ_DEFAULT_VHOST: /
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "5671:5672"
+      - "15671:15672"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
       - rabbitmq_logs:/var/log/rabbitmq
@@ -104,8 +104,8 @@ services:
     volumes:
       - minio_data:/data
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "7000:9000"
+      - "7001:9001"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 30s

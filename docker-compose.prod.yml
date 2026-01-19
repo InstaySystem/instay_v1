@@ -1,90 +1,175 @@
 services:
-  backend:
+  server:
+    image: instay_v1-sv:latest
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: instay_backend
+    init: true
     restart: unless-stopped
-    environment:
-      PG_HOST: ${PG_HOST:-localhost}
-      PG_PORT: ${PG_PORT:-5432}
-      PG_USER: ${PG_USER:-postgres}
-      PG_PASSWORD: ${PG_PASSWORD:-postgres}
-      PG_SSL_MODE: ${PG_SSL_MODE:-disable}
-      PG_DB_NAME: ${PG_DB_NAME:-app_db}
-
-      RD_HOST: ${RD_HOST}
-      RD_PORT: ${RD_PORT:-6379}
-      RD_PASSWORD: ${RD_PASSWORD:-redis123}
-
-      RMQ_HOST: ${RMQ_HOST}
-      RMQ_USER: ${RMQ_USER:-rabbitmq}
-      RMQ_PASSWORD: ${RMQ_PASSWORD:-rabbitmq}
-      RMQ_VHOST: ${RMQ_VHOST:-/}
-
-      S3_BUCKET: ${S3_BUCKET}
-      S3_FOLDER: ${S3_FOLDER}
-      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
-      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
-      S3_REGION: ${S3_REGION:-us-east-1}
-
-      SMTP_HOST: ${SMTP_HOST}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USER: ${SMTP_USER}
-      SMTP_PASSWORD: ${SMTP_PASSWORD}
-
-      IMAP_HOST: ${IMAP_HOST}
-      IMAP_PORT: ${IMAP_PORT:-993}
-      IMAP_USER: ${IMAP_USER}
-      IMAP_PASSWORD: ${IMAP_PASSWORD}
-
-      JWT_ACCESS_NAME: ${JWT_ACCESS_NAME:-access_token}
-      JWT_REFRESH_NAME: ${JWT_REFRESH_NAME:-refresh_token}
-      JWT_GUEST_NAME: ${JWT_GUEST_NAME:-guest_token}
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-secret-key-change-this}
-      JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN:-15m}
-      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-168h}
-
-      SV_API_PREFIX: ${SV_API_PREFIX:-/api/v1}
-      SV_PORT: 8080
-      SV_WRITE_TIMEOUT: ${SV_WRITE_TIMEOUT:-15s}
-      SV_READ_TIMEOUT: ${SV_READ_TIMEOUT:-15s}
-      SV_IDLE_TIMEOUT: ${SV_IDLE_TIMEOUT:-60s}
-      SV_ALLOW_ORIGINS: ${SV_ALLOW_ORIGINS:-https://yourdomain.com}
-      SV_ALLOW_METHODS: ${SV_ALLOW_METHODS:-GET,POST,PUT,DELETE,PATCH,OPTIONS}
-      SV_ALLOW_HEADERS: ${SV_ALLOW_HEADERS:-Origin,Content-Type,Accept,Authorization}
-      SV_EXPOSE_HEADERS: ${SV_EXPOSE_HEADERS:-Content-Length}
-      SV_ALLOW_CREDENTIALS: ${SV_ALLOW_CREDENTIALS:-true}
-      SV_MAX_AGE: ${SV_MAX_AGE:-12h}
-      SV_MAX_HEADER_BYTES: ${SV_MAX_HEADER_BYTES:-5}
+    env_file:
+      - ./backend/.env.prod
     expose:
       - "8080"
     volumes:
       - ./backend/logs:/app/logs
     networks:
-      - app_network
+      - frontend
+      - backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- --tries=1 ${SV_HEALTHCHECK_URL} || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
 
-  frontend:
+  postgres:
+    image: postgres:15.1-alpine
+    container_name: postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${PG_DB_NAME}
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend
+    expose:
+      - "5432"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${PG_USER} -d ${PG_DB_NAME}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${RD_PASSWORD}
+    networks:
+      - backend
+    expose:
+      - "6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RMQ_PASSWORD}
+      RABBITMQ_DEFAULT_VHOST: /
+    expose:
+      - "5672"
+      - "15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - rabbitmq_logs:/var/log/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - backend
+
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MIN_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MIN_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
+    expose:
+      - "9000"
+      - "9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - backend
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: minio_init
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MIN_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MIN_ROOT_PASSWORD}
+      APP_USER: ${MIN_USER}
+      APP_PASSWORD: ${MIN_PASSWORD}
+      APP_ACCESS_KEY: ${MIN_ACCESS_KEY_ID}
+      APP_SECRET_KEY: ${MIN_SECRET_ACCESS_KEY}
+      BUCKET: ${MIN_BUCKET}
+    entrypoint: >
+      /bin/sh -c "
+      sleep 5;
+      mc alias set myminio http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD;
+      mc mb myminio/$$BUCKET --ignore-existing;
+      mc admin user add myminio $$APP_USER $$APP_PASSWORD || true;
+      mc admin policy attach myminio consoleAdmin --user $$APP_USER;
+      mc admin user svcacct add myminio $$APP_USER --access-key $$APP_ACCESS_KEY --secret-key $$APP_SECRET_KEY || true;
+      echo 'Setup complete!';
+      exit 0;
+      "
+    networks:
+      - backend
+
+  client:
+    image: instay_v1-cl:latest
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://yourdomain.com/api/v1}
-    container_name: instay_frontend
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    init: true
     restart: unless-stopped
-    environment:
-      NODE_ENV: production
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://yourdomain.com/api/v1}
+    env_file:
+      - ./frontend/.env.prod
     expose:
       - "3000"
     depends_on:
-      - backend
+      server:
+        condition: service_healthy
     networks:
-      - app_network
+      - frontend
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- --tries=1 ${CL_HEALTHCHECK_URL} || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
   nginx:
     image: nginx:alpine
-    container_name: instay_nginx
+    container_name: nginx
     restart: unless-stopped
     ports:
       - "80:80"
@@ -95,18 +180,34 @@ services:
       - ./certbot/conf:/etc/letsencrypt:ro
       - ./certbot/www:/var/www/certbot:ro
     depends_on:
-      - frontend
-      - backend
+      client:
+        condition: service_healthy
+      server:
+        condition: service_healthy
     networks:
-      - app_network
+      - frontend
 
   certbot:
     image: certbot/certbot
-    container_name: instay_certbot
+    container_name: icertbot
     volumes:
       - ./certbot/conf:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot
 
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  rabbitmq_data:
+    driver: local
+  rabbitmq_logs:
+    driver: local
+  minio_data:
+    driver: local
+
 networks:
-  app_network:
+  frontend:
+    driver: bridge
+  backend:
     driver: bridge
