@@ -1,6 +1,6 @@
 services:
-  backend:
-    image: instay_v1-be:latest
+  server:
+    image: instay_v1-sv:latest
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -142,8 +142,8 @@ services:
     networks:
       - backend
 
-  frontend:
-    image: instay_v1-fe:latest
+  client:
+    image: instay_v1-cl:latest
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -156,7 +156,7 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      backend:
+      server:
         condition: service_healthy
     networks:
       - frontend

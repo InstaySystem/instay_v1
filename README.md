@@ -31,12 +31,12 @@ instay/
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/InstaySystem/is-fullstack.git instay
+git clone https://github.com/InstaySystem/instay_v1.git instay
 cd instay
 ```
 
 2. **Start the complete development environment**
 ```bash
-docker-compose -f docker-compose.local.yml up -d --build
+docker-compose --env-file .env.local -f docker-compose.local.yml up -d --build
 ```
 
