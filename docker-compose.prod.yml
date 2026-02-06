@@ -1,6 +1,6 @@
 services:
   server:
-    image: instay_v1-sv:latest
+    image: tienhai2808/instay_v1-server:latest
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -143,12 +143,7 @@ services:
       - backend
 
   client:
-    image: instay_v1-cl:latest
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    image: tienhai2808/instay_v1-client:latest
     init: true
     restart: unless-stopped
     env_file:

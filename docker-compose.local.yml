@@ -1,6 +1,7 @@
 services:
   server:
     image: instay_v1-sv:latest
+    container_name: instay_server
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -33,7 +34,7 @@ services:
 
   postgres:
     image: postgres:15.1-alpine
-    container_name: postgres
+    container_name: instay_postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${PG_DB_NAME:-db123}
@@ -56,13 +57,13 @@ services:
 
   redis:
     image: redis:7.2-alpine
-    container_name: redis
+    container_name: instay_redis
     restart: unless-stopped
     command: redis-server --appendonly yes --requirepass ${RD_PASSWORD:-12345678}
     networks:
       - backend
     ports:
-      - "6379:6379"
+      - "6378:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -73,7 +74,7 @@ services:
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
-    container_name: rabbitmq
+    container_name: instay_rabbitmq
     restart: unless-stopped
     environment:
       RABBITMQ_DEFAULT_USER: ${RMQ_USER:-user123}
@@ -95,7 +96,7 @@ services:
 
   minio:
     image: minio/minio:latest
-    container_name: minio
+    container_name: instay_minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
@@ -116,7 +117,7 @@ services:
 
   minio-init:
     image: minio/mc:latest
-    container_name: minio_init
+    container_name: instay_minio_init
     depends_on:
       minio:
         condition: service_healthy
@@ -144,6 +145,7 @@ services:
 
   client:
     image: instay_v1-cl:latest
+    container_name: instay_client
     build:
       context: ./frontend
       dockerfile: Dockerfile
