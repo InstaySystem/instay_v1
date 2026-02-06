@@ -1,9 +1,6 @@
 services:
   server:
     image: tienhai2808/instay_v1-server:latest
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
     init: true
     restart: unless-stopped
     env_file:
