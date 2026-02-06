@@ -1,6 +1,6 @@
 services:
   server:
-    image: instay_v1-sv:latest
+    image: instay_v1_local-sv:latest
     container_name: instay_server
     build:
       context: ./backend
@@ -144,7 +144,7 @@ services:
       - backend
 
   client:
-    image: instay_v1-cl:latest
+    image: instay_v1_local-cl:latest
     container_name: instay_client
     build:
       context: ./frontend
