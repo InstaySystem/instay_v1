@@ -114,7 +114,6 @@ services:
       retries: 3
     networks:
       - backend
-      - frontend
 
   minio-init:
     image: minio/mc:latest
