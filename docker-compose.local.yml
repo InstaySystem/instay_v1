@@ -13,6 +13,7 @@ services:
       - "8080:8080"
     volumes:
       - ./backend/logs:/app/logs
+      - ./backend/configs/gcs.json:/app/configs/gcs.json
     networks:
       - frontend
       - backend
@@ -20,8 +21,6 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      minio:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
@@ -94,55 +93,6 @@ services:
     networks:
       - backend
 
-  minio:
-    image: minio/minio:latest
-    container_name: instay_minio
-    restart: unless-stopped
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MIN_ROOT_USER:-admin123}
-      MINIO_ROOT_PASSWORD: ${MIN_ROOT_PASSWORD:-12345678}
-    volumes:
-      - minio_data:/data
-    ports:
-      - "7000:9000"
-      - "7001:9001"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
-    networks:
-      - backend
-
-  minio-init:
-    image: minio/mc:latest
-    container_name: instay_minio_init
-    depends_on:
-      minio:
-        condition: service_healthy
-    environment:
-      MINIO_ROOT_USER: ${MIN_ROOT_USER:-admin123}
-      MINIO_ROOT_PASSWORD: ${MIN_ROOT_PASSWORD:-12345678}
-      APP_USER: ${MIN_USER:-user123}
-      APP_PASSWORD: ${MIN_PASSWORD:-12345678}
-      APP_ACCESS_KEY: ${MIN_ACCESS_KEY_ID:-APPUSER_ACCESS_KEY}
-      APP_SECRET_KEY: ${MIN_SECRET_ACCESS_KEY:-APPUSER_SECRET_KEY_123456}
-      BUCKET: ${MIN_BUCKET:-uploads}
-    entrypoint: >
-      /bin/sh -c "
-      sleep 5;
-      mc alias set myminio http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD;
-      mc mb myminio/$$BUCKET --ignore-existing;
-      mc admin user add myminio $$APP_USER $$APP_PASSWORD || true;
-      mc admin policy attach myminio consoleAdmin --user $$APP_USER;
-      mc admin user svcacct add myminio $$APP_USER --access-key $$APP_ACCESS_KEY --secret-key $$APP_SECRET_KEY || true;
-      echo 'Setup complete!';
-      exit 0;
-      "
-    networks:
-      - backend
-
   client:
     image: instay_v1_local-cl:latest
     container_name: instay_client
@@ -171,8 +121,6 @@ volumes:
   rabbitmq_data:
     driver: local
   rabbitmq_logs:
-    driver: local
-  minio_data:
     driver: local
 
 networks:
